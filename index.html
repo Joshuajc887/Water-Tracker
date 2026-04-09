@@ -65,7 +65,7 @@
 
       input:focus { outline: none; border-color: #1a6b4a; }
 
-      button {
+      .btn-primary {
         background-color: #1a6b4a;
         color: white;
         padding: 10px 24px;
@@ -76,7 +76,33 @@
         width: 100%;
       }
 
-      button:hover { background-color: #145c3e; }
+      .btn-primary:hover { background-color: #145c3e; }
+
+      .btn-export {
+        background-color: white;
+        color: #1a6b4a;
+        padding: 10px 24px;
+        border: 2px solid #1a6b4a;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        display: block;
+        width: 100%;
+      }
+
+      .btn-export:hover { background-color: #f0f4f8; }
+
+      .btn-delete {
+        background-color: #fff0f0;
+        color: #c0392b;
+        border: 1px solid #f5c6cb;
+        border-radius: 5px;
+        padding: 4px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .btn-delete:hover { background-color: #f8d7da; }
 
       table {
         width: 100%;
@@ -112,15 +138,8 @@
         font-weight: bold;
       }
 
-      .badge-pass {
-        background-color: #d4edda;
-        color: #155724;
-      }
-
-      .badge-fail {
-        background-color: #f8d7da;
-        color: #721c24;
-      }
+      .badge-pass { background-color: #d4edda; color: #155724; }
+      .badge-fail { background-color: #f8d7da; color: #721c24; }
 
       .standards-box {
         background: white;
@@ -135,13 +154,29 @@
 
       .standards-box strong { color: #1a6b4a; }
 
-      canvas {
+      .chart-box {
         background: white;
         border-radius: 10px;
         padding: 20px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         margin-top: 10px;
       }
+
+      .export-section {
+        background: white;
+        border-radius: 10px;
+        padding: 20px 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-top: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .export-info { font-size: 14px; color: #555; }
+      .export-info strong { color: #1a6b4a; display: block; font-size: 15px; margin-bottom: 4px; }
 
       hr { border: none; border-top: 1px solid #ddd; margin: 40px 0 0; }
     </style>
@@ -196,7 +231,7 @@
       <label>Dissolved Oxygen (mg/L)</label>
       <input type="number" id="do" step="0.01" min="0" placeholder="e.g. 6.8">
 
-      <button type="button" onclick="addEntry()">Add Entry</button>
+      <button type="button" class="btn-primary" onclick="addEntry()">Add Entry</button>
 
     </form>
 
@@ -213,17 +248,33 @@
         <th>pH Status</th>
         <th>Turbidity Status</th>
         <th>DO Status</th>
+        <th>Action</th>
       </tr>
     </table>
 
-    <h2>Chart</h2>
-    <canvas id="myChart"></canvas>
+    <div class="export-section">
+      <div class="export-info">
+        <strong>Export Data</strong>
+        Download all logged entries as a CSV file — opens in Excel or Google Sheets.
+      </div>
+      <button class="btn-export" onclick="exportCSV()">Download CSV</button>
+    </div>
+
+    <h2>Bar Chart — Readings by Station</h2>
+    <div class="chart-box">
+      <canvas id="barChart"></canvas>
+    </div>
+
+    <h2>Line Graph — Readings Over Time</h2>
+    <div class="chart-box">
+      <canvas id="lineChart"></canvas>
+    </div>
 
     <script>
-      const entries = [];
+      let entries = [];
 
-      const ctx = document.getElementById("myChart").getContext("2d");
-      const myChart = new Chart(ctx, {
+      const barCtx = document.getElementById("barChart").getContext("2d");
+      const barChart = new Chart(barCtx, {
         type: "bar",
         data: {
           labels: [],
@@ -235,18 +286,57 @@
         },
         options: {
           responsive: true,
+          plugins: { legend: { position: "top" } },
           scales: { y: { beginAtZero: true } }
         }
       });
 
-      function checkStatus(parameter, value) {
-        if (parameter === "ph") {
-          return (value >= 6.5 && value <= 8.5) ? "Pass" : "Fail";
-        } else if (parameter === "turbidity") {
-          return (value <= 50) ? "Pass" : "Fail";
-        } else if (parameter === "do") {
-          return (value >= 5) ? "Pass" : "Fail";
+      const lineCtx = document.getElementById("lineChart").getContext("2d");
+      const lineChart = new Chart(lineCtx, {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: "pH",
+              data: [],
+              borderColor: "rgba(54, 162, 235, 1)",
+              backgroundColor: "rgba(54, 162, 235, 0.1)",
+              tension: 0.3,
+              fill: true
+            },
+            {
+              label: "Turbidity (NTU)",
+              data: [],
+              borderColor: "rgba(255, 159, 64, 1)",
+              backgroundColor: "rgba(255, 159, 64, 0.1)",
+              tension: 0.3,
+              fill: true
+            },
+            {
+              label: "DO (mg/L)",
+              data: [],
+              borderColor: "rgba(75, 192, 192, 1)",
+              backgroundColor: "rgba(75, 192, 192, 0.1)",
+              tension: 0.3,
+              fill: true
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: "top" } },
+          scales: {
+            x: { title: { display: true, text: "Date" } },
+            y: { beginAtZero: true, title: { display: true, text: "Value" } }
+          }
         }
+      });
+
+      function checkStatus(parameter, value) {
+        if (parameter === "ph") return (value >= 6.5 && value <= 8.5) ? "Pass" : "Fail";
+        if (parameter === "turbidity") return (value <= 50) ? "Pass" : "Fail";
+        if (parameter === "do") return (value >= 5) ? "Pass" : "Fail";
       }
 
       function makeBadge(status) {
@@ -254,8 +344,62 @@
         return '<span class="badge ' + cssClass + '">' + status + '</span>';
       }
 
+      function rebuildTable() {
+        const table = document.getElementById("dataTable");
+        while (table.rows.length > 1) table.deleteRow(1);
+
+        entries.forEach((e, index) => {
+          const row = table.insertRow();
+          row.insertCell().innerText = e.date;
+          row.insertCell().innerText = e.location;
+          row.insertCell().innerText = e.ph;
+          row.insertCell().innerText = e.turbidity;
+          row.insertCell().innerText = e.dissolvedO;
+          row.insertCell().innerHTML = makeBadge(checkStatus("ph", e.ph));
+          row.insertCell().innerHTML = makeBadge(checkStatus("turbidity", e.turbidity));
+          row.insertCell().innerHTML = makeBadge(checkStatus("do", e.dissolvedO));
+          const deleteCell = row.insertCell();
+          deleteCell.innerHTML = '<button class="btn-delete" onclick="deleteEntry(' + index + ')">Delete</button>';
+        });
+      }
+
+      function rebuildCharts() {
+        barChart.data.labels = [];
+        barChart.data.datasets[0].data = [];
+        barChart.data.datasets[1].data = [];
+        barChart.data.datasets[2].data = [];
+
+        lineChart.data.labels = [];
+        lineChart.data.datasets[0].data = [];
+        lineChart.data.datasets[1].data = [];
+        lineChart.data.datasets[2].data = [];
+
+        entries.forEach(e => {
+          const chartLabel = e.location + " (" + e.date + ")";
+          barChart.data.labels.push(chartLabel);
+          barChart.data.datasets[0].data.push(e.ph);
+          barChart.data.datasets[1].data.push(e.turbidity);
+          barChart.data.datasets[2].data.push(e.dissolvedO);
+
+          lineChart.data.labels.push(e.date);
+          lineChart.data.datasets[0].data.push(e.ph);
+          lineChart.data.datasets[1].data.push(e.turbidity);
+          lineChart.data.datasets[2].data.push(e.dissolvedO);
+        });
+
+        barChart.update();
+        lineChart.update();
+      }
+
       function updateStats() {
         const count = entries.length;
+        if (count === 0) {
+          document.getElementById("statCount").innerText = 0;
+          document.getElementById("statPh").innerText = "—";
+          document.getElementById("statTurbidity").innerText = "—";
+          document.getElementById("statDo").innerText = "—";
+          return;
+        }
         const avgPh = entries.reduce((sum, e) => sum + e.ph, 0) / count;
         const avgTurbidity = entries.reduce((sum, e) => sum + e.turbidity, 0) / count;
         const avgDo = entries.reduce((sum, e) => sum + e.dissolvedO, 0) / count;
@@ -264,6 +408,46 @@
         document.getElementById("statPh").innerText = avgPh.toFixed(2);
         document.getElementById("statTurbidity").innerText = avgTurbidity.toFixed(2);
         document.getElementById("statDo").innerText = avgDo.toFixed(2);
+      }
+
+      function deleteEntry(index) {
+        if (!confirm("Are you sure you want to delete this entry?")) return;
+        entries.splice(index, 1);
+        rebuildTable();
+        rebuildCharts();
+        updateStats();
+      }
+
+      function exportCSV() {
+        if (entries.length === 0) {
+          alert("No entries to export yet. Please add at least one entry first.");
+          return;
+        }
+
+        const headers = ["Date", "Location", "pH", "Turbidity (NTU)", "DO (mg/L)", "pH Status", "Turbidity Status", "DO Status"];
+
+        const rows = entries.map(e => [
+          e.date,
+          e.location,
+          e.ph,
+          e.turbidity,
+          e.dissolvedO,
+          checkStatus("ph", e.ph),
+          checkStatus("turbidity", e.turbidity),
+          checkStatus("do", e.dissolvedO)
+        ]);
+
+        const csvContent = [headers, ...rows]
+          .map(row => row.join(","))
+          .join("\n");
+
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "water_quality_data.csv";
+        a.click();
+        URL.revokeObjectURL(url);
       }
 
       function addEntry() {
@@ -279,30 +463,9 @@
         }
 
         entries.push({ date, location, ph, turbidity, dissolvedO });
-
-        const phStatus = checkStatus("ph", ph);
-        const turbidityStatus = checkStatus("turbidity", turbidity);
-        const doStatus = checkStatus("do", dissolvedO);
-
-        const table = document.getElementById("dataTable");
-        const row = table.insertRow();
-        row.insertCell().innerText = date;
-        row.insertCell().innerText = location;
-        row.insertCell().innerText = ph;
-        row.insertCell().innerText = turbidity;
-        row.insertCell().innerText = dissolvedO;
-        row.insertCell().innerHTML = makeBadge(phStatus);
-        row.insertCell().innerHTML = makeBadge(turbidityStatus);
-        row.insertCell().innerHTML = makeBadge(doStatus);
-
-        myChart.data.labels.push(location + " (" + date + ")");
-        myChart.data.datasets[0].data.push(ph);
-        myChart.data.datasets[1].data.push(turbidity);
-        myChart.data.datasets[2].data.push(dissolvedO);
-        myChart.update();
-
+        rebuildTable();
+        rebuildCharts();
         updateStats();
-
         document.getElementById("dataForm").reset();
       }
     </script>

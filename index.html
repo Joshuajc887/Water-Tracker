@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Water Quality Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f0f4f8;
+        color: #333;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 30px 20px;
+      }
+
+      h1 { color: #1a6b4a; margin-bottom: 5px; }
+      h2 { color: #1a6b4a; margin-top: 40px; }
+      p { color: #666; margin-bottom: 20px; }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 30px;
+      }
+
+      .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 16px 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        text-align: center;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: #888;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .stat-value { font-size: 26px; font-weight: bold; color: #1a6b4a; }
+      .stat-unit { font-size: 12px; color: #aaa; margin-top: 2px; }
+
+      form {
+        background: white;
+        padding: 24px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      }
+
+      label { font-size: 14px; font-weight: bold; color: #444; }
+
+      input {
+        width: 100%;
+        padding: 8px 12px;
+        margin-top: 4px;
+        margin-bottom: 16px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 14px;
+        box-sizing: border-box;
+      }
+
+      input:focus { outline: none; border-color: #1a6b4a; }
+
+      button {
+        background-color: #1a6b4a;
+        color: white;
+        padding: 10px 24px;
+        border: none;
+        border-radius: 6px;
+        font-size: 15px;
+        cursor: pointer;
+        width: 100%;
+      }
+
+      button:hover { background-color: #145c3e; }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      }
+
+      th {
+        background-color: #1a6b4a;
+        color: white;
+        padding: 12px 16px;
+        text-align: left;
+        font-size: 14px;
+      }
+
+      td {
+        padding: 10px 16px;
+        font-size: 14px;
+        border-bottom: 1px solid #eee;
+      }
+
+      tr:last-child td { border-bottom: none; }
+      tr:nth-child(even) { background-color: #f9f9f9; }
+
+      .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .badge-pass {
+        background-color: #d4edda;
+        color: #155724;
+      }
+
+      .badge-fail {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+
+      .standards-box {
+        background: white;
+        border-radius: 10px;
+        padding: 16px 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 30px;
+        font-size: 13px;
+        color: #555;
+        border-left: 4px solid #1a6b4a;
+      }
+
+      .standards-box strong { color: #1a6b4a; }
+
+      canvas {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-top: 10px;
+      }
+
+      hr { border: none; border-top: 1px solid #ddd; margin: 40px 0 0; }
+    </style>
+  </head>
+  <body>
+
+    <h1>Water Quality Tracker</h1>
+    <p>Log your water quality readings below.</p>
+
+    <div class="standards-box">
+      <strong>DENR Class C Water Quality Standards (DAO 2016-08)</strong><br>
+      pH: 6.5 – 8.5 &nbsp;|&nbsp; Turbidity: ≤ 50 NTU &nbsp;|&nbsp; Dissolved Oxygen: ≥ 5 mg/L
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Entries</div>
+        <div class="stat-value" id="statCount">0</div>
+        <div class="stat-unit">readings</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Average pH</div>
+        <div class="stat-value" id="statPh">—</div>
+        <div class="stat-unit">0–14 scale</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Turbidity</div>
+        <div class="stat-value" id="statTurbidity">—</div>
+        <div class="stat-unit">NTU</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Average DO</div>
+        <div class="stat-value" id="statDo">—</div>
+        <div class="stat-unit">mg/L</div>
+      </div>
+    </div>
+
+    <form id="dataForm">
+
+      <label>Date</label>
+      <input type="date" id="date">
+
+      <label>Location / Source</label>
+      <input type="text" id="location" placeholder="e.g. Iligan River, Station 1">
+
+      <label>pH Level (0–14)</label>
+      <input type="number" id="ph" step="0.01" min="0" max="14" placeholder="e.g. 7.2">
+
+      <label>Turbidity (NTU)</label>
+      <input type="number" id="turbidity" step="0.1" min="0" placeholder="e.g. 5.3">
+
+      <label>Dissolved Oxygen (mg/L)</label>
+      <input type="number" id="do" step="0.01" min="0" placeholder="e.g. 6.8">
+
+      <button type="button" onclick="addEntry()">Add Entry</button>
+
+    </form>
+
+    <hr>
+
+    <h2>Logged Entries</h2>
+    <table id="dataTable">
+      <tr>
+        <th>Date</th>
+        <th>Location</th>
+        <th>pH</th>
+        <th>Turbidity (NTU)</th>
+        <th>DO (mg/L)</th>
+        <th>pH Status</th>
+        <th>Turbidity Status</th>
+        <th>DO Status</th>
+      </tr>
+    </table>
+
+    <h2>Chart</h2>
+    <canvas id="myChart"></canvas>
+
+    <script>
+      const entries = [];
+
+      const ctx = document.getElementById("myChart").getContext("2d");
+      const myChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: [],
+          datasets: [
+            { label: "pH", data: [], backgroundColor: "rgba(54, 162, 235, 0.7)" },
+            { label: "Turbidity (NTU)", data: [], backgroundColor: "rgba(255, 159, 64, 0.7)" },
+            { label: "DO (mg/L)", data: [], backgroundColor: "rgba(75, 192, 192, 0.7)" }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      function checkStatus(parameter, value) {
+        if (parameter === "ph") {
+          return (value >= 6.5 && value <= 8.5) ? "Pass" : "Fail";
+        } else if (parameter === "turbidity") {
+          return (value <= 50) ? "Pass" : "Fail";
+        } else if (parameter === "do") {
+          return (value >= 5) ? "Pass" : "Fail";
+        }
+      }
+
+      function makeBadge(status) {
+        const cssClass = status === "Pass" ? "badge-pass" : "badge-fail";
+        return '<span class="badge ' + cssClass + '">' + status + '</span>';
+      }
+
+      function updateStats() {
+        const count = entries.length;
+        const avgPh = entries.reduce((sum, e) => sum + e.ph, 0) / count;
+        const avgTurbidity = entries.reduce((sum, e) => sum + e.turbidity, 0) / count;
+        const avgDo = entries.reduce((sum, e) => sum + e.dissolvedO, 0) / count;
+
+        document.getElementById("statCount").innerText = count;
+        document.getElementById("statPh").innerText = avgPh.toFixed(2);
+        document.getElementById("statTurbidity").innerText = avgTurbidity.toFixed(2);
+        document.getElementById("statDo").innerText = avgDo.toFixed(2);
+      }
+
+      function addEntry() {
+        const date = document.getElementById("date").value;
+        const location = document.getElementById("location").value;
+        const ph = parseFloat(document.getElementById("ph").value);
+        const turbidity = parseFloat(document.getElementById("turbidity").value);
+        const dissolvedO = parseFloat(document.getElementById("do").value);
+
+        if (!date || !location || isNaN(ph) || isNaN(turbidity) || isNaN(dissolvedO)) {
+          alert("Please fill in all fields before adding an entry.");
+          return;
+        }
+
+        entries.push({ date, location, ph, turbidity, dissolvedO });
+
+        const phStatus = checkStatus("ph", ph);
+        const turbidityStatus = checkStatus("turbidity", turbidity);
+        const doStatus = checkStatus("do", dissolvedO);
+
+        const table = document.getElementById("dataTable");
+        const row = table.insertRow();
+        row.insertCell().innerText = date;
+        row.insertCell().innerText = location;
+        row.insertCell().innerText = ph;
+        row.insertCell().innerText = turbidity;
+        row.insertCell().innerText = dissolvedO;
+        row.insertCell().innerHTML = makeBadge(phStatus);
+        row.insertCell().innerHTML = makeBadge(turbidityStatus);
+        row.insertCell().innerHTML = makeBadge(doStatus);
+
+        myChart.data.labels.push(location + " (" + date + ")");
+        myChart.data.datasets[0].data.push(ph);
+        myChart.data.datasets[1].data.push(turbidity);
+        myChart.data.datasets[2].data.push(dissolvedO);
+        myChart.update();
+
+        updateStats();
+
+        document.getElementById("dataForm").reset();
+      }
+    </script>
+
+  </body>
+</html>
